@@ -31,7 +31,10 @@ TICKERS = {
 
 
 def fetch_quote(symbol: str) -> dict | None:
-    """Fetch a single quote from Yahoo Finance v8 chart API."""
+    """Fetch a single quote from Yahoo Finance v8 chart API.
+    Uses OHLCV close prices (same method as Streamlit/yfinance)
+    so that % change is consistent across both platforms.
+    """
     url = (
         f"https://query1.finance.yahoo.com/v8/finance/chart/"
         f"{urllib.parse.quote(symbol, safe='')}?range=5d&interval=1d"
@@ -45,13 +48,27 @@ def fetch_quote(symbol: str) -> dict | None:
         result = data.get("chart", {}).get("result", [None])[0]
         if not result:
             return None
-        meta = result["meta"]
+
+        # --- Use OHLCV close series (matches yfinance behaviour) ---
+        closes = result.get("indicators", {}).get("quote", [{}])[0].get("close", [])
+        # Filter out None values (holidays / missing days)
+        closes = [c for c in closes if c is not None]
+
+        if len(closes) >= 2:
+            price = closes[-1]
+            prev = closes[-2]
+            change = ((price - prev) / prev) * 100
+            return {"price": round(price, 4), "change": round(change, 4)}
+        elif len(closes) == 1:
+            return {"price": round(closes[0], 4), "change": 0.0}
+
+        # Fallback to meta if OHLCV not available
+        meta = result.get("meta", {})
         price = meta.get("regularMarketPrice")
-        prev = meta.get("chartPreviousClose") or meta.get("previousClose")
-        if price is None or prev is None:
-            return None
-        change = ((price - prev) / prev) * 100
-        return {"price": round(price, 4), "change": round(change, 4)}
+        if price is not None:
+            return {"price": round(price, 4), "change": 0.0}
+
+        return None
     except Exception:
         return None
 
