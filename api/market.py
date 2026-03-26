@@ -9,6 +9,7 @@ import json
 import urllib.request
 import urllib.error
 import urllib.parse
+from datetime import datetime, timezone
 
 
 TICKERS = {
@@ -28,6 +29,21 @@ TICKERS = {
     "COPPER": "HG=F",
     "TLT":    "TLT",
 }
+
+
+def _dedupe_daily(timestamps, closes):
+    """Yahoo v8 API sometimes appends an intraday data point that shares
+    the same calendar date as the previous daily bar.  yfinance silently
+    drops this duplicate; we do the same so % change matches Streamlit."""
+    if len(timestamps) < 2 or len(closes) < 2:
+        return closes
+
+    last_date = datetime.fromtimestamp(timestamps[-1], tz=timezone.utc).date()
+    prev_date = datetime.fromtimestamp(timestamps[-2], tz=timezone.utc).date()
+
+    if last_date == prev_date:
+        return closes[:-1]
+    return closes
 
 
 def fetch_quote(symbol: str) -> dict | None:
@@ -50,25 +66,31 @@ def fetch_quote(symbol: str) -> dict | None:
             return None
 
         # --- Use OHLCV close series (matches yfinance behaviour) ---
-        closes = result.get("indicators", {}).get("quote", [{}])[0].get("close", [])
+        raw_closes = result.get("indicators", {}).get("quote", [{}])[0].get("close", [])
+        timestamps = result.get("timestamp", [])
+
         # Filter out None values (holidays / missing days)
-        closes = [c for c in closes if c is not None]
+        # Keep parallel lists so timestamp index stays aligned
+        pairs = [(ts, c) for ts, c in zip(timestamps, raw_closes) if c is not None]
+        if not pairs:
+            # No OHLCV data — fall back to meta
+            meta = result.get("meta", {})
+            price = meta.get("regularMarketPrice")
+            return {"price": round(price, 4), "change": 0.0} if price else None
+
+        ts_clean, closes = zip(*pairs)
+
+        # Drop intraday duplicate (same-date extra bar)
+        closes = list(_dedupe_daily(list(ts_clean), list(closes)))
 
         if len(closes) >= 2:
             price = closes[-1]
             prev = closes[-2]
             change = ((price - prev) / prev) * 100
             return {"price": round(price, 4), "change": round(change, 4)}
-        elif len(closes) == 1:
-            return {"price": round(closes[0], 4), "change": 0.0}
 
-        # Fallback to meta if OHLCV not available
-        meta = result.get("meta", {})
-        price = meta.get("regularMarketPrice")
-        if price is not None:
-            return {"price": round(price, 4), "change": 0.0}
+        return {"price": round(closes[0], 4), "change": 0.0}
 
-        return None
     except Exception:
         return None
 
