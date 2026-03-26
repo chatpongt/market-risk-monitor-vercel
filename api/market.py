@@ -6,6 +6,7 @@ Endpoint: /api/market
 
 from http.server import BaseHTTPRequestHandler
 import json
+import math
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -44,6 +45,44 @@ def _dedupe_daily(timestamps, closes):
     if last_date == prev_date:
         return closes[:-1]
     return closes
+
+
+def _fetch_closes(symbol: str) -> list:
+    """Fetch deduplicated close series for a symbol (for MOVE calc)."""
+    url = (
+        f"https://query1.finance.yahoo.com/v8/finance/chart/"
+        f"{urllib.parse.quote(symbol, safe='')}?range=5d&interval=1d"
+    )
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+        result = data.get("chart", {}).get("result", [None])[0]
+        if not result:
+            return []
+        raw_closes = result.get("indicators", {}).get("quote", [{}])[0].get("close", [])
+        timestamps = result.get("timestamp", [])
+        pairs = [(ts, c) for ts, c in zip(timestamps, raw_closes) if c is not None]
+        if not pairs:
+            return []
+        ts_clean, closes = zip(*pairs)
+        return list(_dedupe_daily(list(ts_clean), list(closes)))
+    except Exception:
+        return []
+
+
+def _compute_move_proxy(tlt_closes: list) -> float | None:
+    """Derive MOVE Index proxy from TLT historical vol (same as Streamlit)."""
+    if len(tlt_closes) < 3:
+        return None
+    returns = [(tlt_closes[i] - tlt_closes[i - 1]) / tlt_closes[i - 1]
+               for i in range(1, len(tlt_closes))]
+    mean_r = sum(returns) / len(returns)
+    variance = sum((r - mean_r) ** 2 for r in returns) / (len(returns) - 1)
+    std_r = math.sqrt(variance)
+    return round(std_r * math.sqrt(252) * 100 * 10, 1)
 
 
 def fetch_quote(symbol: str) -> dict | None:
@@ -105,6 +144,13 @@ class handler(BaseHTTPRequestHandler):
                 results[display] = quote
             else:
                 errors.append(display)
+
+        # Derive MOVE proxy from TLT vol (same method as Streamlit)
+        if "TLT" in results:
+            tlt_closes = _fetch_closes("TLT")
+            move = _compute_move_proxy(tlt_closes)
+            if move is not None:
+                results["MOVE"] = {"price": move, "change": 0.0}
 
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
