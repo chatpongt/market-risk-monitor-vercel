@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler
 import json
 import urllib.request
 import urllib.error
+import urllib.parse
 
 
 TICKERS = {
@@ -31,10 +32,15 @@ TICKERS = {
 
 def fetch_quote(symbol: str) -> dict | None:
     """Fetch a single quote from Yahoo Finance v8 chart API."""
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(symbol)}?range=5d&interval=1d"
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    url = (
+        f"https://query1.finance.yahoo.com/v8/finance/chart/"
+        f"{urllib.parse.quote(symbol, safe='')}?range=5d&interval=1d"
+    )
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    })
     try:
-        with urllib.request.urlopen(req, timeout=8) as resp:
+        with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read().decode())
         result = data.get("chart", {}).get("result", [None])[0]
         if not result:
@@ -50,23 +56,29 @@ def fetch_quote(symbol: str) -> dict | None:
         return None
 
 
-import urllib.parse
-
-
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         results = {}
+        errors = []
         for display, yahoo in TICKERS.items():
             quote = fetch_quote(yahoo)
             if quote:
                 results[display] = quote
+            else:
+                errors.append(display)
 
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Cache-Control", "s-maxage=900, stale-while-revalidate=1800")
         self.end_headers()
-        self.wfile.write(json.dumps({"data": results, "live": len(results) > 0}).encode())
+        payload = {
+            "data": results,
+            "live": len(results) > 0,
+            "fetched": len(results),
+            "failed": errors,
+        }
+        self.wfile.write(json.dumps(payload).encode())
 
     def do_OPTIONS(self):
         self.send_response(200)
