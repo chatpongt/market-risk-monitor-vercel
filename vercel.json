@@ -8,10 +8,15 @@
     {
       "src": "index.html",
       "use": "@vercel/static"
+    },
+    {
+      "src": "iran-dashboard.html",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
     { "src": "/api/market", "dest": "/api/market.py" },
+    { "src": "/iran-dashboard", "dest": "/iran-dashboard.html" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
