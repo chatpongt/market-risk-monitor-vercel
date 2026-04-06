@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BCA's Iran Conflict Daily Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+        :root { --primary: #1e40af; }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: #f8fafc;
+            color: #111827;
+            line-height: 1.5;
+        }
+
+        .header {
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        .logo {
+            width: 40px;
+            height: 40px;
+            background: #1e40af;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .tab-bar {
+            display: flex;
+            gap: 32px;
+            overflow-x: auto;
+            padding: 0 24px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .tab {
+            padding: 16px 4px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #64748b;
+            cursor: pointer;
+            white-space: nowrap;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab.active {
+            color: var(--primary);
+            border-bottom: 3px solid var(--primary);
+            font-weight: 600;
+        }
+
+        .summary {
+            background: white;
+            border-radius: 24px;
+            padding: 32px;
+            margin: 32px 0;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .card {
+            background: white;
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+        }
+
+        h1 { font-size: 28px; font-weight: 600; }
+        h2 { font-size: 24px; font-weight: 600; margin-bottom: 16px; }
+
+        .highlight {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="container" style="padding-top: 20px; padding-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 16px;">
+                <div class="logo">BCA</div>
+                <div>
+                    <h1>BCA's Iran Conflict Daily Dashboard</h1>
+                    <p style="font-size: 14px; color: #64748b;">แดชบอร์ดความขัดแย้งอิหร่านประจำวัน • แผนภูมิเรียลไทม์ วิกฤตช่องแคบฮอร์มุซ • พลังงาน • ความเสี่ยงเศรษฐกิจมหภาค</p>
+                </div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 13px; color: #64748b;">อัปเดตล่าสุด</div>
+                <div style="font-weight: 600; color: #10b981;">29 มีนาคม 2569</div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tab-bar container">
+            <div class="tab" onclick="switchTab(0)" id="tab-0">All</div>
+            <div class="tab active" onclick="switchTab(1)" id="tab-1">Conflict</div>
+            <div class="tab" onclick="switchTab(2)" id="tab-2">Energy Flows</div>
+            <div class="tab" onclick="switchTab(3)" id="tab-3">Commodities</div>
+            <div class="tab" onclick="switchTab(4)" id="tab-4">Macro</div>
+        </div>
+    </div>
+
+    <div class="container" style="padding-top: 24px; padding-bottom: 40px;">
+        <!-- สรุปวิกฤต -->
+        <div class="summary">
+            <h2 style="text-align: center; margin-bottom: 24px; font-size: 28px;">วิกฤตอยู่ในจุดเปลี่ยนสำคัญหรือไม่?</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; font-size: 16px;">
+                <div>
+                    <span class="highlight" style="background: #fee2e2; color: #b91c1c;">สถานการณ์ปัจจุบัน</span><br>
+                    สหรัฐฯ ขยายเส้นตายการหยุดยิงเป็นวันที่ <strong>6 เมษายน 2569</strong> หลังประธานาธิบดีทรัมป์เผชิญแรงกดดันจากเลือกตั้งกลางเทอม ขณะที่อิหร่านยังคงรักษาแรงกดดันทางการเมืองไว้เต็มที่
+                </div>
+                <div>
+                    <span class="highlight" style="background: #fee2e2; color: #b91c1c;">การโจมตียังดำเนินต่อเนื่อง</span><br>
+                    การยิงโดรนและขีปนาวุธจากทั้งสองฝ่ายยังไม่ลดลง แม้จะมีสัญญาณการเจรจาเบื้องต้น แต่ยังไม่มีข้อตกลงที่ชัดเจน
+                </div>
+                <div>
+                    <span class="highlight" style="background: #fefce8; color: #854d0e;">ผลกระทบต่อพลังงาน</span><br>
+                    เรือบรรทุกน้ำมันบางส่วนเริ่มผ่านช่องแคบฮอร์มุซหลังจ่ายค่าธรรมเนียม ผลกระทบต่ออุปทานพลังงานโลกยังจำกัด ประเทศเอเชียลดการบริโภคพลังงาน
+                </div>
+                <div>
+                    <span class="highlight" style="background: #dbeafe; color: #1e40af;">ปฏิกิริยาตลาด</span><br>
+                    ตลาดแสดงสัญญาณเครียดเพิ่มเติม: สเปรด Brent-WTI, Brent dated-to-frontline, ทองแดง, อะลูมิเนียม และ VIX ดีดตัวขึ้นอย่างรวดเร็ว
+                </div>
+            </div>
+
+            <div style="margin-top: 32px; background: linear-gradient(90deg, #eff6ff, #ecfdf5); border: 1px solid #bfdbfe; border-radius: 16px; padding: 24px; text-align: center;">
+                <p style="font-weight: 600; font-size: 18px; margin-bottom: 8px;">Outlook สัปดาห์หน้า</p>
+                <p style="color: #1f2937;">หากอิหร่านยอมรับการเจรจาอย่างจริงจังภายในสัปดาห์นี้ พลังงานน่าจะถึงจุดสูงสุด หุ้นจะฟื้นตัว และผลตอบแทนพันธบัตรจะลดลงอย่างมีนัยสำคัญ</p>
+                <div style="margin-top: 16px; font-size: 13px; color: #64748b;">โอกาสหยุดยิงภายใน 30 วัน: <span style="font-weight: 700; color: #10b981;">52%</span></div>
+            </div>
+
+            <div style="text-align: center; margin-top: 32px; font-size: 12px; color: #9ca3af;">Updated: 29 มีนาคม 2569 • BCA Research • ข้อมูลเรียลไทม์</div>
+        </div>
+
+        <!-- TAB: Conflict -->
+        <div id="tab-content-1" class="tab-panel active">
+            <h2 style="font-size: 24px; margin-bottom: 8px;">Conflict (ความขัดแย้ง)</h2>
+            <p style="color: #64748b; margin-bottom: 24px;">ข้อมูลรายวันเกี่ยวกับการโจมตีด้วยโดรน-ขีปนาวุธ การประท้วง และโอกาสหยุดยิง (29 มี.ค. 2569)</p>
+            <div class="grid" id="conflict-grid"></div>
+        </div>
+
+        <!-- TAB: Energy Flows -->
+        <div id="tab-content-2" class="tab-panel">
+            <h2 style="font-size: 24px; margin-bottom: 8px;">Energy Flows (การไหลของพลังงาน)</h2>
+            <p style="color: #64748b; margin-bottom: 24px;">การส่งออกน้ำมัน ปริมาณการขนส่งทางช่องแคบฮอร์มุซ และอุปทานพลังงานโลก (29 มี.ค. 2569)</p>
+            <div class="grid" id="energy-grid"></div>
+        </div>
+
+        <!-- TAB: Commodities -->
+        <div id="tab-content-3" class="tab-panel">
+            <h2 style="font-size: 24px; margin-bottom: 8px;">Commodities (สินค้าโภคภัณฑ์)</h2>
+            <p style="color: #64748b; margin-bottom: 24px;">ราคาน้ำมันดิบ ทองคำ ก๊าซธรรมชาติ และโลหะอุตสาหกรรมในช่วงวิกฤต (29 มี.ค. 2569)</p>
+            <div class="grid" id="commodities-grid"></div>
+        </div>
+
+        <!-- TAB: Macro -->
+        <div id="tab-content-4" class="tab-panel">
+            <h2 style="font-size: 24px; margin-bottom: 8px;">Macro (เศรษฐกิจมหภาค)</h2>
+            <p style="color: #64748b; margin-bottom: 24px;">ผลกระทบจากวิกฤตอิหร่านต่อตลาดการเงินโลก • GDP • เงินเฟ้อ • ความเสี่ยง recession</p>
+            <div class="grid" id="macro-grid"></div>
+        </div>
+
+        <!-- TAB: All -->
+        <div id="tab-content-0" class="tab-panel">
+            <h2 style="font-size: 24px; margin-bottom: 8px;">All (ภาพรวมทั้งหมด)</h2>
+            <p style="color: #64748b; margin-bottom: 24px;">ภาพรวมตัวชี้วัดหลักจากทุกหมวด (29 มี.ค. 2569)</p>
+            <div class="grid" id="all-grid"></div>
+        </div>
+    </div>
+
+    <script>
+        const LABELS = ['28 Feb', '5 Mar', '12 Mar', '19 Mar', '26 Mar', '29 Mar'];
+
+        function createChart(canvasId, label, data, color, type = 'line') {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+            new Chart(ctx, {
+                type: type,
+                data: {
+                    labels: LABELS,
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        borderColor: color,
+                        backgroundColor: color + '20',
+                        tension: 0.4,
+                        borderWidth: 3,
+                        pointRadius: type === 'bar' ? 0 : 3,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: true, text: label, font: { size: 14 }, padding: { bottom: 20 } }
+                    },
+                    scales: {
+                        y: { grid: { color: '#f1f5f9' }, ticks: { color: '#64748b' } },
+                        x: { grid: { color: '#f1f5f9' }, ticks: { color: '#64748b' } }
+                    }
+                }
+            });
+        }
+
+        function buildGrid(containerId, cards) {
+            const html = cards.map(c => `
+                <div class="card">
+                    <h3 style="font-weight:600; margin-bottom:8px;">${c.title}</h3>
+                    <p style="font-size:12px; color:#64748b; margin-bottom:16px;">${c.subtitle}</p>
+                    <div style="position:relative; height:240px;">
+                        <canvas id="${c.id}"></canvas>
+                    </div>
+                </div>`).join('');
+            document.getElementById(containerId).innerHTML = html;
+        }
+
+        /* ── CONFLICT ── */
+        const conflictCards = [
+            { id: 'chart-uae',      title: 'Iran Attacks On UAE',                    subtitle: 'จำนวนโดรนและขีปนาวุธที่ยิงใส่ UAE' },
+            { id: 'chart-daily',    title: 'Iran Attacks On Neighbors: Daily Change', subtitle: 'อัตราการยิง (เปลี่ยนแปลงรายวัน)' },
+            { id: 'chart-total',    title: 'Total Attacks On Neighbors',              subtitle: 'จำนวนเหตุการณ์โจมตีรวม' },
+            { id: 'chart-ceasefire',title: 'Odds Of US-Iran Ceasefire',              subtitle: 'โอกาสเกิดการหยุดยิง' },
+            { id: 'chart-fatal',    title: 'Confirmed Fatalities',                   subtitle: 'จำนวนผู้เสียชีวิตที่ยืนยัน' },
+            { id: 'chart-protest',  title: 'Protest Events In Iran',                 subtitle: 'จำนวนเหตุการณ์ประท้วงในอิหร่าน' },
+            { id: 'chart-vessel',   title: 'Attacks On Vessels (Hormuz)',             subtitle: 'การโจมตีเรือในช่องแคบฮอร์มุซ' },
+        ];
+
+        /* ── ENERGY FLOWS ── */
+        const energyCards = [
+            { id: 'chart-hormuz-transit', title: 'Hormuz Daily Transit (Tankers)',    subtitle: 'จำนวนเรือบรรทุกน้ำมันผ่านช่องแคบฮอร์มุซต่อวัน' },
+            { id: 'chart-iran-export',    title: 'Iran Crude Oil Exports (mb/d)',      subtitle: 'การส่งออกน้ำมันดิบของอิหร่าน (ล้านบาร์เรล/วัน)' },
+            { id: 'chart-opec-spare',     title: 'OPEC+ Spare Capacity (mb/d)',        subtitle: 'กำลังการผลิตสำรองของ OPEC+' },
+            { id: 'chart-lng-spot',       title: 'LNG Spot Price ($/MMBtu)',           subtitle: 'ราคา LNG ตลาดสปอต' },
+            { id: 'chart-asia-import',    title: 'Asia Oil Imports From Gulf (%)',     subtitle: 'สัดส่วนการนำเข้าน้ำมันจากอ่าวเปอร์เซียของเอเชีย' },
+            { id: 'chart-spe-reserve',    title: 'US SPR Release (mb)',               subtitle: 'การปล่อยน้ำมันสำรองยุทธศาสตร์สหรัฐฯ' },
+        ];
+
+        /* ── COMMODITIES ── */
+        const commoditiesCards = [
+            { id: 'chart-brent',    title: 'Brent Crude Oil ($/bbl)',         subtitle: 'ราคาน้ำมันดิบเบรนต์' },
+            { id: 'chart-wti',      title: 'WTI Crude Oil ($/bbl)',           subtitle: 'ราคาน้ำมันดิบ WTI' },
+            { id: 'chart-gold',     title: 'Gold ($/oz)',                     subtitle: 'ราคาทองคำต่อออนซ์' },
+            { id: 'chart-natgas',   title: 'Natural Gas ($/MMBtu)',           subtitle: 'ราคาก๊าซธรรมชาติ Henry Hub' },
+            { id: 'chart-copper',   title: 'Copper ($/ton)',                  subtitle: 'ราคาทองแดง (LME)' },
+            { id: 'chart-aluminum', title: 'Aluminum ($/ton)',                subtitle: 'ราคาอะลูมิเนียม (LME)' },
+            { id: 'chart-brent-wti',title: 'Brent–WTI Spread ($/bbl)',       subtitle: 'ส่วนต่างราคาน้ำมันเบรนต์-WTI' },
+        ];
+
+        /* ── MACRO ── */
+        const macroCards = [
+            { id: 'chart-equity',    title: 'Global Equity Markets',          subtitle: 'S&P 500 / MSCI World' },
+            { id: 'chart-vix',       title: 'VIX Volatility Index',           subtitle: 'ความผันผวนตลาด' },
+            { id: 'chart-yield',     title: '10-Year US Treasury Yield',      subtitle: 'ผลตอบแทนพันธบัตร' },
+            { id: 'chart-inflation', title: 'Global Inflation Expectation',   subtitle: 'CPI โลก' },
+            { id: 'chart-gdp',       title: 'Global GDP Growth Forecast 2026',subtitle: 'การปรับลดคาดการณ์ GDP' },
+            { id: 'chart-recession', title: 'Recession Probability',          subtitle: 'โอกาสถดถอย' },
+            { id: 'chart-dxy',       title: 'US Dollar Index (DXY)',          subtitle: 'ดอลลาร์แข็งค่า' },
+            { id: 'chart-thb',       title: 'THB vs USD',                     subtitle: 'เงินบาทอ่อนค่า' },
+        ];
+
+        function renderConflictCharts() {
+            createChart('chart-uae',       'Attacks on UAE',              [8, 14, 22, 31, 19, 28],             '#ef4444');
+            createChart('chart-daily',     'Daily Change',                [45, 62, -8, 85, 33, 55],            '#3b82f6');
+            createChart('chart-total',     'Total Attacks',               [120, 185, 210, 245, 228, 265],      '#8b5cf6');
+            createChart('chart-ceasefire', 'Ceasefire Probability (%)',   [35, 42, 28, 45, 38, 52],            '#10b981');
+            createChart('chart-fatal',     'Fatalities',                  [12, 18, 25, 31, 22, 35],            '#ec4899');
+            createChart('chart-protest',   'Protests',                    [15, 28, 42, 19, 33, 27],            '#f59e0b');
+            createChart('chart-vessel',    'Vessel Attacks',              [3, 5, 8, 2, 4, 7],                  '#14b8a6');
+        }
+
+        function renderEnergyCharts() {
+            createChart('chart-hormuz-transit', 'Tankers/Day',            [18, 15, 11, 8, 10, 9],              '#3b82f6');
+            createChart('chart-iran-export',    'Iran Exports (mb/d)',    [1.8, 1.5, 1.1, 0.7, 0.9, 0.6],     '#ef4444');
+            createChart('chart-opec-spare',     'Spare Capacity (mb/d)', [3.2, 3.1, 2.9, 2.6, 2.7, 2.5],     '#10b981');
+            createChart('chart-lng-spot',       'LNG $/MMBtu',           [14, 17, 22, 31, 28, 34],            '#f59e0b');
+            createChart('chart-asia-import',    'Asia Gulf Import %',    [62, 60, 55, 49, 52, 47],            '#8b5cf6');
+            createChart('chart-spe-reserve',    'SPR Release (mb)',      [0, 5, 12, 20, 18, 25],              '#14b8a6');
+        }
+
+        function renderCommoditiesCharts() {
+            createChart('chart-brent',     'Brent $/bbl',                [82, 89, 98, 112, 106, 118],         '#ef4444');
+            createChart('chart-wti',       'WTI $/bbl',                  [79, 85, 93, 106, 101, 112],         '#f97316');
+            createChart('chart-gold',      'Gold $/oz',                  [2020, 2080, 2150, 2310, 2280, 2390],'#f59e0b');
+            createChart('chart-natgas',    'Nat Gas $/MMBtu',            [2.1, 2.4, 2.9, 3.8, 3.5, 4.2],     '#10b981');
+            createChart('chart-copper',    'Copper $/ton',               [8500, 8200, 7900, 7500, 7700, 7300],'#ec4899');
+            createChart('chart-aluminum',  'Aluminum $/ton',             [2200, 2350, 2550, 2800, 2700, 2950],'#8b5cf6');
+            createChart('chart-brent-wti', 'Brent–WTI Spread $/bbl',    [3.2, 4.1, 5.0, 6.2, 5.8, 6.5],     '#14b8a6');
+        }
+
+        function renderMacroCharts() {
+            createChart('chart-equity',    'MSCI World Index',            [2850, 2720, 2580, 2450, 2620, 2550],'#3b82f6');
+            createChart('chart-vix',       'VIX Level',                  [18, 24, 31, 42, 38, 45],            '#ef4444');
+            createChart('chart-yield',     '10Y Yield (%)',               [4.2, 3.9, 3.6, 3.4, 3.5, 3.3],    '#10b981');
+            createChart('chart-inflation', 'Breakeven Inflation (%)',     [2.8, 3.1, 3.6, 4.2, 4.5, 4.8],    '#f59e0b');
+            createChart('chart-gdp',       'GDP Growth (%)',              [3.2, 3.0, 2.8, 2.5, 2.3, 2.1],    '#8b5cf6', 'bar');
+            createChart('chart-recession', 'Recession Odds (%)',          [25, 32, 41, 48, 55, 52],           '#ec4899');
+            createChart('chart-dxy',       'DXY Index',                  [102, 104, 106, 109, 107, 110],      '#14b8a6');
+            createChart('chart-thb',       'THB per USD',                 [35.2, 36.1, 37.4, 38.8, 38.2, 39.1],'#f43f5e');
+        }
+
+        /* ── ALL tab: one representative chart from each category ── */
+        const allCards = [
+            { id: 'all-ceasefire', title: 'Odds Of US-Iran Ceasefire',    subtitle: 'โอกาสเกิดการหยุดยิง' },
+            { id: 'all-brent',     title: 'Brent Crude Oil ($/bbl)',      subtitle: 'ราคาน้ำมันดิบเบรนต์' },
+            { id: 'all-hormuz',    title: 'Hormuz Daily Transit (Tankers)',subtitle: 'จำนวนเรือบรรทุกน้ำมันผ่านช่องแคบต่อวัน' },
+            { id: 'all-vix',       title: 'VIX Volatility Index',         subtitle: 'ความผันผวนตลาด' },
+            { id: 'all-gold',      title: 'Gold ($/oz)',                  subtitle: 'ราคาทองคำต่อออนซ์' },
+            { id: 'all-dxy',       title: 'US Dollar Index (DXY)',        subtitle: 'ดอลลาร์แข็งค่า' },
+        ];
+
+        function renderAllCharts() {
+            createChart('all-ceasefire', 'Ceasefire Probability (%)', [35, 42, 28, 45, 38, 52],             '#10b981');
+            createChart('all-brent',     'Brent $/bbl',               [82, 89, 98, 112, 106, 118],          '#ef4444');
+            createChart('all-hormuz',    'Tankers/Day',                [18, 15, 11, 8, 10, 9],               '#3b82f6');
+            createChart('all-vix',       'VIX Level',                  [18, 24, 31, 42, 38, 45],             '#f59e0b');
+            createChart('all-gold',      'Gold $/oz',                  [2020, 2080, 2150, 2310, 2280, 2390], '#f59e0b');
+            createChart('all-dxy',       'DXY Index',                  [102, 104, 106, 109, 107, 110],       '#14b8a6');
+        }
+
+        /* ── Tab switching ── */
+        const rendered = { 0: false, 1: false, 2: false, 3: false, 4: false };
+
+        function switchTab(n) {
+            document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
+            const target = document.getElementById('tab-content-' + n);
+            if (target) target.classList.add('active');
+            document.querySelectorAll('.tab').forEach((tab, i) => {
+                tab.classList.toggle('active', i === n);
+            });
+
+            if (!rendered[n]) {
+                rendered[n] = true;
+                setTimeout(() => {
+                    if (n === 0) renderAllCharts();
+                    if (n === 2) renderEnergyCharts();
+                    if (n === 3) renderCommoditiesCharts();
+                }, 50);
+            }
+        }
+
+        window.onload = function() {
+            buildGrid('conflict-grid',    conflictCards);
+            buildGrid('energy-grid',      energyCards);
+            buildGrid('commodities-grid', commoditiesCards);
+            buildGrid('macro-grid',       macroCards);
+            buildGrid('all-grid',         allCards);
+
+            rendered[1] = true;
+            rendered[4] = true;
+            setTimeout(() => {
+                renderConflictCharts();
+                renderMacroCharts();
+            }, 100);
+        };
+    </script>
+</body>
+</html>
