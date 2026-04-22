@@ -1,22 +1,15 @@
 {
   "version": 2,
   "builds": [
-    {
-      "src": "api/market.py",
-      "use": "@vercel/python"
-    },
-    {
-      "src": "index.html",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "iran-dashboard.html",
-      "use": "@vercel/static"
-    }
+    { "src": "api/market.py",        "use": "@vercel/python" },
+    { "src": "api/iran.py",          "use": "@vercel/python" },
+    { "src": "index.html",           "use": "@vercel/static" },
+    { "src": "iran-dashboard.html",  "use": "@vercel/static" }
   ],
   "routes": [
-    { "src": "/api/market", "dest": "/api/market.py" },
-    { "src": "/iran-dashboard", "dest": "/iran-dashboard.html" },
-    { "src": "/(.*)", "dest": "/index.html" }
+    { "src": "/api/market",      "dest": "/api/market.py" },
+    { "src": "/api/iran",        "dest": "/api/iran.py" },
+    { "src": "/iran-dashboard",  "dest": "/iran-dashboard.html" },
+    { "src": "/(.*)",            "dest": "/index.html" }
   ]
 }

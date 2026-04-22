@@ -211,13 +211,36 @@
     <script>
         const LABELS = ['22 Mar', '29 Mar', '5 Apr', '12 Apr', '19 Apr', '22 Apr'];
 
-        function createChart(canvasId, label, data, color, type = 'line') {
+        let marketData = {};
+
+        async function fetchMarketData() {
+            try {
+                const resp = await fetch('/api/iran');
+                if (resp.ok) {
+                    const json = await resp.json();
+                    marketData = json.data || {};
+                }
+            } catch (e) { /* use static fallback */ }
+        }
+
+        // Returns real API data if available, else static fallback.
+        // transform: optional fn applied element-wise to API values (e.g. unit conversion)
+        function fromAPI(key, fallbackValues, transform) {
+            const d = marketData[key];
+            if (d && d.values && d.values.length >= 2) {
+                const vals = transform ? d.values.map(transform) : d.values;
+                return { labels: d.labels, values: vals.map(v => Math.round(v * 100) / 100) };
+            }
+            return { labels: LABELS, values: fallbackValues };
+        }
+
+        function createChart(canvasId, label, data, color, type = 'line', chartLabels = LABELS) {
             const ctx = document.getElementById(canvasId);
             if (!ctx) return;
             new Chart(ctx, {
                 type: type,
                 data: {
-                    labels: LABELS,
+                    labels: chartLabels,
                     datasets: [{
                         label: label,
                         data: data,
@@ -320,24 +343,52 @@
         }
 
         function renderCommoditiesCharts() {
-            createChart('chart-brent',     'Brent $/bbl',                [98, 118, 124, 131, 127, 135],        '#ef4444');
-            createChart('chart-wti',       'WTI $/bbl',                  [93, 112, 117, 124, 120, 128],        '#f97316');
-            createChart('chart-gold',      'Gold $/oz',                  [2150, 2390, 2450, 2520, 2490, 2560], '#f59e0b');
-            createChart('chart-natgas',    'Nat Gas $/MMBtu',            [2.9, 4.2, 4.8, 5.2, 4.9, 5.5],      '#10b981');
-            createChart('chart-copper',    'Copper $/ton',               [7900, 7300, 7100, 6900, 7200, 7000], '#ec4899');
-            createChart('chart-aluminum',  'Aluminum $/ton',             [2550, 2950, 3100, 3250, 3150, 3300], '#8b5cf6');
-            createChart('chart-brent-wti', 'Brent–WTI Spread $/bbl',    [5.0, 6.5, 7.1, 7.5, 7.2, 7.8],      '#14b8a6');
+            const LB_TO_TON = 2204.62;
+
+            const brent  = fromAPI('BRENT',  [98, 118, 124, 131, 127, 135]);
+            const wti    = fromAPI('WTI',    [93, 112, 117, 124, 120, 128]);
+            const gold   = fromAPI('GOLD',   [2150, 2390, 2450, 2520, 2490, 2560]);
+            const gas    = fromAPI('NATGAS', [2.9, 4.2, 4.8, 5.2, 4.9, 5.5]);
+            // HG=F is USD/lb — convert to USD/metric ton
+            const copper = fromAPI('COPPER', [7900, 7300, 7100, 6900, 7200, 7000],
+                                   v => Math.round(v * LB_TO_TON));
+            // ALI=F is already USD/metric ton
+            const alu    = fromAPI('ALU',    [2550, 2950, 3100, 3250, 3150, 3300]);
+
+            // Brent–WTI spread (computed client-side when both series are from API)
+            let spreadLabels = LABELS, spreadValues = [5.0, 6.5, 7.1, 7.5, 7.2, 7.8];
+            if (marketData.BRENT && marketData.WTI &&
+                brent.labels === marketData.BRENT.labels) {
+                spreadLabels = brent.labels;
+                spreadValues = brent.values.map((b, i) =>
+                    Math.round((b - wti.values[i]) * 100) / 100);
+            }
+
+            createChart('chart-brent',     'Brent $/bbl',            brent.values,   '#ef4444', 'line', brent.labels);
+            createChart('chart-wti',       'WTI $/bbl',              wti.values,     '#f97316', 'line', wti.labels);
+            createChart('chart-gold',      'Gold $/oz',              gold.values,    '#f59e0b', 'line', gold.labels);
+            createChart('chart-natgas',    'Nat Gas $/MMBtu',        gas.values,     '#10b981', 'line', gas.labels);
+            createChart('chart-copper',    'Copper $/ton',           copper.values,  '#ec4899', 'line', copper.labels);
+            createChart('chart-aluminum',  'Aluminum $/ton',         alu.values,     '#8b5cf6', 'line', alu.labels);
+            createChart('chart-brent-wti', 'Brent–WTI Spread $/bbl',spreadValues,   '#14b8a6', 'line', spreadLabels);
         }
 
         function renderMacroCharts() {
-            createChart('chart-equity',    'MSCI World Index',            [2580, 2550, 2480, 2410, 2460, 2430], '#3b82f6');
-            createChart('chart-vix',       'VIX Level',                  [31, 45, 48, 52, 49, 51],             '#ef4444');
-            createChart('chart-yield',     '10Y Yield (%)',               [3.6, 3.3, 3.1, 2.9, 3.0, 2.8],     '#10b981');
-            createChart('chart-inflation', 'Breakeven Inflation (%)',     [3.6, 4.8, 5.1, 5.4, 5.2, 5.6],     '#f59e0b');
-            createChart('chart-gdp',       'GDP Growth (%)',              [2.8, 2.1, 1.9, 1.7, 1.8, 1.6],     '#8b5cf6', 'bar');
-            createChart('chart-recession', 'Recession Odds (%)',          [41, 52, 58, 62, 59, 61],            '#ec4899');
-            createChart('chart-dxy',       'DXY Index',                  [106, 110, 112, 114, 113, 115],       '#14b8a6');
-            createChart('chart-thb',       'THB per USD',                 [37.4, 39.1, 40.2, 41.5, 41.0, 42.1],'#f43f5e');
+            const spx = fromAPI('SPX',    [2580, 2550, 2480, 2410, 2460, 2430], Math.round);
+            const vix  = fromAPI('VIX',   [31, 45, 48, 52, 49, 51]);
+            const y10  = fromAPI('US10Y', [3.6, 3.3, 3.1, 2.9, 3.0, 2.8]);
+            const dxy  = fromAPI('DXY',   [106, 110, 112, 114, 113, 115]);
+            const thb  = fromAPI('USDTHB',[37.4, 39.1, 40.2, 41.5, 41.0, 42.1]);
+
+            createChart('chart-equity',    'S&P 500 Index',               spx.values,  '#3b82f6', 'line', spx.labels);
+            createChart('chart-vix',       'VIX Level',                   vix.values,  '#ef4444', 'line', vix.labels);
+            createChart('chart-yield',     '10Y Yield (%)',                y10.values,  '#10b981', 'line', y10.labels);
+            // Inflation, GDP, recession: analytical estimates — no free real-time API
+            createChart('chart-inflation', 'Breakeven Inflation (%)',     [3.6, 4.8, 5.1, 5.4, 5.2, 5.6], '#f59e0b');
+            createChart('chart-gdp',       'GDP Growth (%)',              [2.8, 2.1, 1.9, 1.7, 1.8, 1.6], '#8b5cf6', 'bar');
+            createChart('chart-recession', 'Recession Odds (%)',          [41, 52, 58, 62, 59, 61],        '#ec4899');
+            createChart('chart-dxy',       'DXY Index',                   dxy.values,  '#14b8a6', 'line', dxy.labels);
+            createChart('chart-thb',       'THB per USD',                 thb.values,  '#f43f5e', 'line', thb.labels);
         }
 
         /* ── ALL tab: one representative chart from each category ── */
@@ -351,12 +402,17 @@
         ];
 
         function renderAllCharts() {
-            createChart('all-ceasefire', 'Ceasefire Probability (%)', [28, 52, 48, 55, 61, 58],              '#10b981');
-            createChart('all-brent',     'Brent $/bbl',               [98, 118, 124, 131, 127, 135],          '#ef4444');
-            createChart('all-hormuz',    'Tankers/Day',                [11, 9, 7, 8, 10, 11],                 '#3b82f6');
-            createChart('all-vix',       'VIX Level',                  [31, 45, 48, 52, 49, 51],              '#f59e0b');
-            createChart('all-gold',      'Gold $/oz',                  [2150, 2390, 2450, 2520, 2490, 2560],  '#f59e0b');
-            createChart('all-dxy',       'DXY Index',                  [106, 110, 112, 114, 113, 115],        '#14b8a6');
+            const brent = fromAPI('BRENT', [98, 118, 124, 131, 127, 135]);
+            const vix   = fromAPI('VIX',   [31, 45, 48, 52, 49, 51]);
+            const gold  = fromAPI('GOLD',  [2150, 2390, 2450, 2520, 2490, 2560]);
+            const dxy   = fromAPI('DXY',   [106, 110, 112, 114, 113, 115]);
+
+            createChart('all-ceasefire', 'Ceasefire Probability (%)', [28, 52, 48, 55, 61, 58],  '#10b981');
+            createChart('all-brent',     'Brent $/bbl',    brent.values, '#ef4444', 'line', brent.labels);
+            createChart('all-hormuz',    'Tankers/Day',    [11, 9, 7, 8, 10, 11],               '#3b82f6');
+            createChart('all-vix',       'VIX Level',      vix.values,   '#f59e0b', 'line', vix.labels);
+            createChart('all-gold',      'Gold $/oz',      gold.values,  '#f59e0b', 'line', gold.labels);
+            createChart('all-dxy',       'DXY Index',      dxy.values,   '#14b8a6', 'line', dxy.labels);
         }
 
         /* ── Tab switching ── */
@@ -380,19 +436,23 @@
             }
         }
 
-        window.onload = function() {
+        window.onload = async function() {
             buildGrid('conflict-grid',    conflictCards);
             buildGrid('energy-grid',      energyCards);
             buildGrid('commodities-grid', commoditiesCards);
             buildGrid('macro-grid',       macroCards);
             buildGrid('all-grid',         allCards);
 
+            // Render static conflict tab immediately (no API needed)
             rendered[1] = true;
+            setTimeout(() => renderConflictCharts(), 100);
+
+            // Fetch real market data, then render Macro (pre-rendered at load)
+            await fetchMarketData();
             rendered[4] = true;
-            setTimeout(() => {
-                renderConflictCharts();
-                renderMacroCharts();
-            }, 100);
+            setTimeout(() => renderMacroCharts(), 50);
+            // Commodities (3), Energy (2), All (0) render lazily on tab switch
+            // using real marketData that is now populated
         };
     </script>
 </body>
